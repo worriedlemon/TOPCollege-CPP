@@ -5,6 +5,7 @@
 
 #include "wapi_nontopcontrol.h"
 #include <list>
+#include <vector>
 
 extern const LPARAM mycall;
 
@@ -17,20 +18,99 @@ enum Figure : long
 {
 	LINE = 0,
 	RECTANGLE = 1,
-	ELLIPSE = 2
+	ELLIPSE = 2,
+	ARC = 3
+};
+
+class PaintEvent
+{
+protected:
+	PaintEvent() = default;
+	virtual ~PaintEvent() = default;
+public:
+	virtual void Handle(HDC& hdc) = 0;
+};
+
+struct PaintText : PaintEvent
+{
+	int x;
+	int y;
+	std::wstring text;
+
+	PaintText(int x, int y, std::wstring const& str)
+		: PaintEvent()
+		, x(x), y(y), text(str) {}
+
+	void Handle(HDC& hdc) final
+	{
+		TextOutW(hdc, x, y, text.c_str(), text.size());
+	}
+};
+
+template <Figure f>
+struct PaintFigure : PaintEvent
+{
+	std::vector<int> x;
+
+	PaintFigure(std::vector<int> const & coords)
+		: PaintEvent()
+		, x(coords)
+	{
+		if (coords.size() != 4) throw std::invalid_argument("Size should be 4");
+	}
+
+	void Handle(HDC& hdc) final
+	{
+		switch (f)
+		{
+		case Figure::LINE:
+			MoveToEx(hdc, x[0], x[1], nullptr);
+			LineTo(hdc, x[2], x[3]);
+			break;
+		case Figure::RECTANGLE:
+			Rectangle(hdc, x[0], x[1], x[2], x[3]);
+			break;
+		case Figure::ELLIPSE:
+			Ellipse(hdc, x[0], x[1], x[2], x[3]);
+			break;
+		}
+	}
+};
+
+template <>
+struct PaintFigure<Figure::ARC> : PaintEvent
+{
+	std::vector<int> x;
+
+	PaintFigure(std::vector<int> const & coords)
+		: PaintEvent()
+		, x(coords)
+	{
+		if (coords.size() != 8) throw std::invalid_argument("Size should be 8");
+	}
+
+	void Handle(HDC& hdc) final
+	{
+		Arc(hdc, x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7]);
+	}
+};
+
+struct UpdatePen : PaintEvent
+{
+	HPEN pen;
+
+	UpdatePen(HPEN pen) : PaintEvent(), pen(pen) {}
+	~UpdatePen() { DeleteObject(pen); }
+
+	void Handle(HDC& hdc) final
+	{
+		SelectObject(hdc, pen);
+	}
 };
 
 class PaintBox : public NonTopControl
 {
-	struct PaintParams
-	{
-		long figure;
-		int x1, y1, x2, y2;
-		std::wstring text;
-	};
-
-	HPEN pen;
-	std::list<PaintParams> paintEvents;
+	std::list<std::shared_ptr<PaintEvent>> paintEvents;
 
 public:
 
@@ -45,29 +125,31 @@ public:
 	};
 
 	PaintBox(HINSTANCE hInstance, WORD id, Control* parent);
-	~PaintBox();
+	~PaintBox() = default;
 
 	void SetPen(PenStyle style, int width, Color color);
 
 	template <Figure f>
-	void Draw(int x1, int y1, int x2, int y2)
+	void Draw(std::vector<int> const & coords)
 	{
-		if (pen == nullptr) throw std::logic_error("Pen is not set");
-
-		PaintParams pp{ f, x1, y1, x2, y2 };
-		paintEvents.push_back(pp);
+		std::shared_ptr<PaintEvent> ev = std::make_shared<PaintFigure<f>>(coords);
+		paintEvents.push_back(ev);
 	}
 
 	void DrawString(int x, int y, std::wstring text)
 	{
-		PaintParams pp{ -1, x, y };
-		pp.text = text;
-		paintEvents.push_back(pp);
+		std::shared_ptr<PaintEvent> ev = std::make_shared<PaintText>(x, y, text);
+		paintEvents.push_back(ev);
 	}
 
 	inline void Update()
 	{
 		PostMessageW(hwnd, WM_PAINT, 0, mycall);
+	}
+
+	inline void Clear()
+	{
+		paintEvents.clear();
 	}
 
 protected:
