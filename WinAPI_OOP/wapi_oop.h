@@ -3,6 +3,7 @@
 #ifndef WINAPI_OOP_H
 #define WINAPI_OOP_H
 
+// Страшная строка для использования стилей Windows
 #pragma comment(linker, "\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
 processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
@@ -13,8 +14,10 @@ processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 #include "wapi_paintbox.h"
 #include "wapi_window.h"
 
+// Макрос для регистрации класса
 #define RegisterControl(class, hInstance) Control::Register(CONTROL_NAME(class), hInstance)
 
+// Макрос для регистрации разных реализованных классов
 #define REGISTER_DEFAULT(hInstance) \
 RegisterControl(PaintBox, hInstance);
 
