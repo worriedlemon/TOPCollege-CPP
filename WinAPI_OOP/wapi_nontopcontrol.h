@@ -19,6 +19,8 @@ public:
 
 	void SetEnabled(bool value);
 
+	bool IsEnabled() const;
+
 	WORD GetId() const final;
 
 protected:

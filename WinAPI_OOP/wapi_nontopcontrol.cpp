@@ -16,6 +16,11 @@ void NonTopControl::SetEnabled(bool value)
 	EnableWindow(hwnd, value);
 }
 
+bool NonTopControl::IsEnabled() const
+{
+	return static_cast<bool>(IsWindowEnabled(hwnd));
+}
+
 WORD NonTopControl::GetId() const
 {
 	return id;
